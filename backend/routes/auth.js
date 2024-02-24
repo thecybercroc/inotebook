@@ -70,4 +70,55 @@ router.post(
   }
 );
 
+// Authenticating a user using: POST "/api/auth/login" (No need to be logged in)
+router.post(
+  "/login",
+  [
+    // Validation checks for user input
+    body("email", "Enter a valid email address").isEmail(),
+    body("password", "Password is required").exists(),
+  ],
+  async (req, res) => {
+    try {
+      // Checking for validation errors
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        // If errors exist, send a response with the errors
+        return res.status(400).json({ errors: errors.array() });
+      }
+
+      const { email, password } = req.body;
+
+      // Checking if a user with the provided email exists
+      const user = await User.findOne({ email });
+
+      if (!user) {
+        // If a user with the email doesn't exist, send an error response
+        return res.status(401).json({ error: "Invalid credentials" });
+      }
+
+      // Checking if the provided password matches the stored hashed password
+      const isPasswordMatch = await bcrypt.compare(password, user.password);
+
+      if (!isPasswordMatch) {
+        // If passwords don't match, send an error response
+        return res.status(401).json({ error: "Invalid credentials" });
+      }
+
+      // Generating a JWT for the authenticated user
+      const data = {
+        id: user.id,
+      };
+      const authToken = jwt.sign(data, JWT_SECRET);
+
+      // Sending a response with the authenticated user information and the JWT
+      res.json({ user, token: authToken });
+    } catch (error) {
+      // Handling any errors that might occur during user authentication
+      console.error(error);
+      res.status(500).send("Internal Server Error");
+    }
+  }
+);
+
 module.exports = router;
